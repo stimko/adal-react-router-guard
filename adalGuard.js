@@ -1,9 +1,8 @@
 import AuthenticationContext from 'adal/adal.js'
-import React from 'react'
 
 var _adal = null
 var _oauthData = { isAuthenticated: false, userName: '', loginError: '', profile: '' }
-var updateDataFromCache = function (resource) {
+const  updateDataFromCache = (resource) => {
   var token = _adal.getCachedToken(resource)
   _oauthData.isAuthenticated = token !== null && token.length > 0
   var user = _adal.getCachedUser() || { userName: '' }
@@ -11,7 +10,12 @@ var updateDataFromCache = function (resource) {
   _oauthData.profile = user.profile
   _oauthData.loginError = _adal.getLoginError()
 }
-var loginHandler = function() {
+const saveToken = (hash) => {
+  var requestInfo = _adal.getRequestInfo(hash)
+  _adal.saveTokenFromHash(requestInfo)
+  _adal.handleWindowCallback(hash)
+}
+const loginHandler = () => {
   _adal._saveItem(_adal.CONSTANTS.STORAGE.START_PAGE, window.location.pathname)
   _adal._logstatus('Start login at:' + window.location.href)
   _adal.login()
@@ -63,28 +67,20 @@ export function setCachedUser(user){
 }
 
 export function requireAuth() {
-	
-	if(window.frameElement && !!~window.frameElement.id.indexOf("adalRenewFrame")){
-		var hash = window.location.hash  
-		var requestInfo = _adal.getRequestInfo(hash)
-    _adal.saveTokenFromHash(requestInfo)
-		_adal.handleWindowCallback(hash)
-	}
+  if(window.frameElement && !!~window.frameElement.id.indexOf("adalRenewFrame")){
+    saveToken(window.location.hash)
+  }
   if(!window.frameElement || window.frameElement.id === 'adalIdTokenFrame'){
     setTimeout(() =>{
       updateDataFromCache(_adal.config.loginResource)
       if (!_oauthData.isAuthenticated) {
         var hash = window.location.hash                 
         if (_adal.isCallback(hash)) {
-          var requestInfo = _adal.getRequestInfo(hash)
-          _adal.saveTokenFromHash(requestInfo)
-
           if(window.localStorage.href && window.self === window.top){
             window.location.href = window.localStorage.href
           }
-
           updateDataFromCache(_adal.config.loginResource)
-          _adal.handleWindowCallback(hash)
+          saveToken(hash)
         } else {
           window.localStorage.href = window.location.href
           loginHandler()
@@ -99,7 +95,7 @@ export function init(configOptions) {
     var existingHash = window.location.hash
     var pathDefault = window.location.href
     if (existingHash) {
-        pathDefault = pathDefault.replace(existingHash, '')
+      pathDefault = pathDefault.replace(existingHash, '')
     }
     configOptions.redirectUri = configOptions.redirectUri || pathDefault
     configOptions.postLogoutRedirectUri = configOptions.postLogoutRedirectUri || pathDefault
